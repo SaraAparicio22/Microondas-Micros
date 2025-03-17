@@ -74,11 +74,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if (remaining_time > 0)
         {
             remaining_time--;
+	    static uint32_t last_display_time = 9999;  // Para evitar refrescar la pantalla constantemente
+            if (remaining_time != last_display_time) {
             char buffer[16];
             snprintf(buffer, 16, "Tiempo: %d s", remaining_time);
-            lcd_clear();
             lcd_put_cur(0, 0);
             lcd_send_string(buffer);
+            last_display_time = remaining_time;
         }
         else
         {
@@ -98,6 +100,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+ if (GPIO_Pin == GPIO_PIN_0) {
+        HAL_Delay(50);  // Pequeño retardo para debounce
+        if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET) {
+            HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_SET);  // LED verde ON
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // LED naranja OFF
+            __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_UPDATE);
+            
+            // Escalar ADC a un rango de tiempo útil (1-30 segundos)
+            remaining_time = (ADC_val * 30) / 255;
+            if (remaining_time == 0) remaining_time = 1;
+
+            __HAL_TIM_SET_COUNTER(&htim2, remaining_time * 1000);  // Ajustar temporizador
+            if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
+                Error_Handler();
+            }
+        }
+    }
+	/* Codigo anterior
   if (GPIO_Pin == GPIO_PIN_0)
   {
       //buttonPressed = 1;
@@ -108,8 +129,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       __HAL_TIM_SET_COUNTER(&htim2, ADC_val*100);
       remaining_time = ADC_val;
       HAL_TIM_Base_Start_IT(&htim2);
-
-  }
+  }*/
+	
 }
 /* USER CODE END 0 */
 
