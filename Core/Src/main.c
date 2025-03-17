@@ -23,11 +23,13 @@
 /* USER CODE BEGIN Includes */
 #include "stm32f4xx_hal.h"
 #include <stdlib.h>
+#include "lcd_i2c.h"
 
 
 volatile uint8_t buttonPressed = 0;
 volatile uint8_t time_end = 0;
 uint32_t ADC_val;
+uint32_t remaining_time;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -69,12 +71,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim->Instance == TIM2)
   {
+	if (remaining_time > 0)
+        {
+            remaining_time--;
+            char buffer[16];
+            snprintf(buffer, 16, "Tiempo: %d s", remaining_time);
+            lcd_clear();
+            lcd_put_cur(0, 0);
+            lcd_send_string(buffer);
+        }
+        else
+        {
+            HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); //LED naranja ON
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); //LED verde OFF
+            HAL_TIM_Base_Stop_IT(&htim2);
+        }
       //time_end = 1;
+     /* Codigo anterior
       HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);  // LED Naranja ON
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, GPIO_PIN_RESET); // LED naranja OFF
       HAL_TIM_Base_Stop_IT(&htim2);
-
+      */
   }
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -87,6 +106,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // LED naranja OFF
       __HAL_TIM_CLEAR_FLAG(&htim2, TIM_IT_UPDATE);
       __HAL_TIM_SET_COUNTER(&htim2, ADC_val*100);
+      remaining_time = ADC_val;
       HAL_TIM_Base_Start_IT(&htim2);
 
   }
@@ -124,6 +144,7 @@ int main(void)
   MX_GPIO_Init();
   MX_ADC1_Init();
   MX_TIM2_Init();
+  lcd_init();  // Inicializar la pantalla LCD
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
